@@ -12,6 +12,7 @@ import { WorkflowMonitor } from "./components/workflow-monitor"
 import { MetadataViewer } from "./components/metadata-viewer"
 import { WorkflowHistory } from "./components/workflow-history"
 import { SystemStatus } from "./components/system-status"
+import { VectorSearch } from "./components/vector-search"
 
 interface WorkflowFile {
   id: string
@@ -180,11 +181,12 @@ export default function WorkflowDashboard() {
 
         {/* Main Content */}
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="upload">Upload Files</TabsTrigger>
             <TabsTrigger value="monitor">Live Monitor</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="search">Vector Search</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -329,6 +331,10 @@ export default function WorkflowDashboard() {
 
           <TabsContent value="history">
             <WorkflowHistory files={files} />
+          </TabsContent>
+
+          <TabsContent value="search">
+            <VectorSearch />
           </TabsContent>
         </Tabs>
       </div>

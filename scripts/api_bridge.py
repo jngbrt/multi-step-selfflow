@@ -184,6 +184,32 @@ def download_file(file_id):
     else:
         return jsonify({'error': 'File not found on disk'}), 404
 
+def vectorize_workflow_data(file_id, file_info):
+    """Send workflow data to vector database for search indexing."""
+    try:
+        import requests
+        
+        # Read current metadata
+        reader = MetadataReader()
+        metadata = reader.extract_workflow_metadata(file_info['path'])
+        
+        if metadata:
+            # Send to vectorization endpoint
+            response = requests.post('http://localhost:3000/api/workflow/vectorize', json={
+                'fileId': file_id,
+                'fileName': file_info['name'],
+                'metadata': metadata,
+                'outputs': file_info.get('outputs', {})
+            })
+            
+            if response.status_code == 200:
+                print(f"✅ Vectorized workflow data for {file_info['name']}")
+            else:
+                print(f"⚠️ Failed to vectorize {file_info['name']}: {response.text}")
+                
+    except Exception as e:
+        print(f"Error vectorizing workflow data: {e}")
+
 def process_file_workflow(file_id):
     """Process a file through the complete workflow."""
     if file_id not in active_files:
@@ -238,6 +264,11 @@ def process_file_workflow(file_id):
         file_info['status'] = 'complete'
         file_info['progress'] = 100
         file_info['lastUpdated'] = time.time()
+        
+        # At the end of process_file_workflow function, after marking as complete:
+        if file_info['status'] == 'complete':
+            # Vectorize the workflow data for search
+            vectorize_workflow_data(file_id, file_info)
         
     except Exception as e:
         print(f"Error processing file {file_id}: {e}")
