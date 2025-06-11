@@ -6,14 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, Play, RotateCcw, Eye, GitBranch, FileText, Zap, Database } from "lucide-react"
+import { Upload, Play, RotateCcw, Eye, GitBranch, FileText, Zap } from "lucide-react"
 import { WorkflowUploader } from "./components/workflow-uploader"
 import { WorkflowMonitor } from "./components/workflow-monitor"
 import { MetadataViewer } from "./components/metadata-viewer"
 import { WorkflowHistory } from "./components/workflow-history"
 import { SystemStatus } from "./components/system-status"
-import { SearchInterface } from "./components/search-interface"
-import { AnalyticsDashboard } from "./components/analytics-dashboard"
 
 interface WorkflowFile {
   id: string
@@ -25,43 +23,13 @@ interface WorkflowFile {
   progress: number
   lastUpdated: string
   historyCount: number
-  priority: number
   outputs?: Record<string, any>
-}
-
-interface SystemInfo {
-  status: string
-  database: {
-    status: string
-    provider: string
-    features: string[]
-  }
-  repository: {
-    name: string
-    branch: string
-    commit: string
-  }
-  workers: {
-    available: string[]
-    active: number
-  }
-  files: {
-    total: number
-    processing: number
-    completed: number
-    pending: number
-    errors: number
-  }
-  performance: {
-    avg_processing_time: number
-  }
 }
 
 export default function WorkflowDashboard() {
   const [files, setFiles] = useState<WorkflowFile[]>([])
   const [selectedFile, setSelectedFile] = useState<WorkflowFile | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null)
   const [systemStats, setSystemStats] = useState({
     totalFiles: 0,
     activeWorkers: 0,
@@ -69,82 +37,86 @@ export default function WorkflowDashboard() {
     avgProcessingTime: 0,
   })
 
-  // Fetch system status
-  const fetchSystemStatus = async () => {
-    try {
-      const response = await fetch("/api/status")
-      if (response.ok) {
-        const data = await response.json()
-        setSystemInfo(data)
-        setSystemStats({
-          totalFiles: data.files.total,
-          activeWorkers: data.workers.active,
-          completedToday: data.files.completed,
-          avgProcessingTime: data.performance.avg_processing_time,
-        })
-      }
-    } catch (error) {
-      console.error("Failed to fetch system status:", error)
-    }
-  }
-
-  // Fetch files
-  const fetchFiles = async () => {
-    try {
-      const response = await fetch("/api/files")
-      if (response.ok) {
-        const data = await response.json()
-        setFiles(data)
-      }
-    } catch (error) {
-      console.error("Failed to fetch files:", error)
-    }
-  }
-
-  // Initial load and periodic updates
+  // Simulate real-time updates
   useEffect(() => {
-    fetchSystemStatus()
-    fetchFiles()
-
     const interval = setInterval(() => {
-      fetchSystemStatus()
-      fetchFiles()
-    }, 5000) // Update every 5 seconds
+      setFiles((prev) =>
+        prev.map((file) => {
+          if (file.status === "processing") {
+            const newProgress = Math.min(file.progress + Math.random() * 10, 100)
+            return {
+              ...file,
+              progress: newProgress,
+              status: newProgress >= 100 ? "complete" : "processing",
+              lastUpdated: new Date().toISOString(),
+            }
+          }
+          return file
+        }),
+      )
+    }, 2000)
 
     return () => clearInterval(interval)
   }, [])
 
   const handleFileUpload = (uploadedFiles: File[]) => {
-    // Files will be uploaded via API, then we'll refresh the list
-    setTimeout(() => {
-      fetchFiles()
-    }, 1000)
+    const newFiles: WorkflowFile[] = uploadedFiles.map((file) => ({
+      id: Math.random().toString(36).substr(2, 9),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      currentRole: "captioner",
+      status: "pending",
+      progress: 0,
+      lastUpdated: new Date().toISOString(),
+      historyCount: 0,
+    }))
+
+    setFiles((prev) => [...prev, ...newFiles])
   }
 
   const startWorkflow = async (fileId: string) => {
     setIsProcessing(true)
 
-    try {
-      const response = await fetch(`/api/files/${fileId}/start`, {
-        method: "POST",
-      })
+    setFiles((prev) => prev.map((file) => (file.id === fileId ? { ...file, status: "processing", progress: 5 } : file)))
 
-      if (response.ok) {
-        // Refresh files to show updated status
-        fetchFiles()
-      }
-    } catch (error) {
-      console.error("Failed to start workflow:", error)
-    } finally {
+    // Simulate workflow execution
+    setTimeout(() => {
+      setFiles((prev) =>
+        prev.map((file) =>
+          file.id === fileId
+            ? {
+                ...file,
+                currentRole: "translator",
+                progress: 50,
+                historyCount: 1,
+                outputs: { caption: "A beautiful image with vibrant colors" },
+              }
+            : file,
+        ),
+      )
+    }, 3000)
+
+    setTimeout(() => {
+      setFiles((prev) =>
+        prev.map((file) =>
+          file.id === fileId
+            ? {
+                ...file,
+                currentRole: "done",
+                status: "complete",
+                progress: 100,
+                historyCount: 2,
+                outputs: {
+                  caption: "A beautiful image with vibrant colors",
+                  translation: "Una hermosa imagen con colores vibrantes",
+                },
+              }
+            : file,
+        ),
+      )
       setIsProcessing(false)
-    }
-  }
-
-  const handleFileSelect = (fileId: string) => {
-    const file = files.find((f) => f.id === fileId)
-    if (file) {
-      setSelectedFile(file)
-    }
+    }, 6000)
   }
 
   const getStatusColor = (status: string) => {
@@ -194,31 +166,12 @@ export default function WorkflowDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
-            <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4" />
-              <span>
-                Connected to {systemInfo?.repository.name || "multi-step-selfflow"} (
-                {systemInfo?.repository.branch || "main"})
-              </span>
-              <Badge variant="outline" className="text-green-600 border-green-600">
-                {systemInfo?.repository.commit || "cd3a520"}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              <span>{systemInfo?.database.provider || "Upstash Vector"}</span>
-              <Badge
-                variant="outline"
-                className={
-                  systemInfo?.database.status === "connected"
-                    ? "text-green-600 border-green-600"
-                    : "text-red-600 border-red-600"
-                }
-              >
-                {systemInfo?.database.status || "disconnected"}
-              </Badge>
-            </div>
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+            <GitBranch className="h-4 w-4" />
+            <span>Connected to multi-step-selfflow (main)</span>
+            <Badge variant="outline" className="text-green-600 border-green-600">
+              cd3a520
+            </Badge>
           </div>
         </div>
 
@@ -227,12 +180,10 @@ export default function WorkflowDashboard() {
 
         {/* Main Content */}
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="upload">Upload Files</TabsTrigger>
-            <TabsTrigger value="search">Search</TabsTrigger>
             <TabsTrigger value="monitor">Live Monitor</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
@@ -292,9 +243,7 @@ export default function WorkflowDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Workflow Files</CardTitle>
-                <CardDescription>
-                  Files in the self-propelling workflow system with database persistence
-                </CardDescription>
+                <CardDescription>Files in the self-propelling workflow system</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -324,8 +273,6 @@ export default function WorkflowDashboard() {
                                 <span>{(file.size / 1024).toFixed(1)} KB</span>
                                 <span>•</span>
                                 <span>{file.historyCount} steps</span>
-                                <span>•</span>
-                                <span>Priority: {file.priority}</span>
                               </div>
                             </div>
                           </div>
@@ -376,16 +323,8 @@ export default function WorkflowDashboard() {
             <WorkflowUploader onFilesUploaded={handleFileUpload} />
           </TabsContent>
 
-          <TabsContent value="search">
-            <SearchInterface onFileSelect={handleFileSelect} />
-          </TabsContent>
-
           <TabsContent value="monitor">
             <WorkflowMonitor files={files} />
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <AnalyticsDashboard />
           </TabsContent>
 
           <TabsContent value="history">
