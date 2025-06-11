@@ -1,0 +1,122 @@
+# Active Metadata Self-Propelling Task Plan
+
+A **starter kit** demonstrating how to build self-propelling, file-embedded workflows using active metadata.  
+Every file carries its own “baton” of instructions; lightweight workers pick up the baton, perform a step, update the metadata with the next instruction, and pass control—no central orchestrator required.
+
+---
+
+## Features
+
+- **Self-Describing**  
+  Files contain a minimal YAML/JSON schema describing the current step and the next baton.
+
+- **Stateless Workers**  
+  Any worker can run on any file; it only acts if its `role` matches.
+
+- **Composable & Extensible**  
+  Add or reorder steps by editing metadata—no code changes required.
+
+- **Audit-Ready**  
+  Each step logs its output in the file’s `history` array, preserving provenance.
+
+---
+
+## Project Structure
+
+selfflow-demo/
+├── selfflow.v1.yml        # Minimal workflow instruction schema
+├── baton_runner.py        # Python worker script
+├── requirements.txt       # Python dependencies
+├── embed-meta.sh          # Shell script to inject metadata
+├── run-chain.sh           # Shell script to demo captioner→translator
+└── README.md              # This documentation
+
+---
+
+## Prerequisites
+
+1. **ExifTool**  
+   - macOS: `brew install exiftool`  
+   - Ubuntu/Debian: `sudo apt-get install libimage-exiftool-perl`
+
+2. **Python 3.8+**  
+   \`\`\`bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+
+	3.	Make scripts executable
+
+chmod +x embed-meta.sh run-chain.sh
+
+
+
+⸻
+
+Installation
+
+git clone https://github.com/yourusername/selfflow-demo.git
+cd selfflow-demo
+# Set up Python environment
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+
+⸻
+
+Usage
+
+1. Embed the Initial Instruction
+
+./embed-meta.sh hero.jpg
+
+This injects selfflow.v1.yml into hero.jpg (as the XMP-dc:Description).
+
+2. Run the Captioner
+
+python baton_runner.py hero.jpg
+# 🤖 Captioner done, baton passed to translator.
+
+3. Run the Translator
+
+# Quickly switch worker identity:
+sed -i '' 's/role: captioner/role: translator/' baton_runner.py
+
+python baton_runner.py hero.jpg
+# 🤖 Translator done, baton passed to done.
+
+4. Inspect Metadata
+
+exiftool -XMP-dc:Description hero.jpg
+
+You’ll see the history array growing and the prompt morphing at each step.
+
+⸻
+
+Customization
+	•	Add new roles by creating a new worker script (or extending baton_runner.py) that checks for your role, performs work against prompt, updates history, and sets next_role/next_prompt_template.
+	•	Swap logic with real LLM calls or OCR instead of the dummy Pillow captioner.
+	•	Embed in other formats (ZIP, PDF, DOCX, QuickTime UserData) by adjusting embed-meta.sh and ExifTool flags.
+
+⸻
+
+Architecture
+
+flowchart TD
+  A[selfflow.v1.yml] -->|embed-meta.sh| B[hero.jpg with metadata]
+  B -->|baton_runner.py (role=captioner)| C[Captioner Worker]
+  C -->|update metadata| D[hero.jpg (role=translator)]
+  D -->|baton_runner.py (role=translator)| E[Translator Worker]
+  E -->|update metadata| F[hero.jpg (role=done)]
+
+
+⸻
+
+License
+
+MIT © 2025 jngbrt
+
+---
+
+This README gives new users a clear overview, setup steps, and usage examples so they can clone the repo and see the self-propelling workflow in action immediately.
