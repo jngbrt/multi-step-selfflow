@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import useSWR from "swr"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,13 +23,19 @@ interface WorkflowFile {
   currentRole: string
   status: "pending" | "processing" | "complete" | "error"
   progress: number
-  lastUpdated: string
+  lastUpdated: number
   historyCount: number
   outputs?: Record<string, any>
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
 export default function WorkflowDashboard() {
-  const [files, setFiles] = useState<WorkflowFile[]>([])
+  const { data: files = [], mutate } = useSWR<WorkflowFile[]>(
+    "http://localhost:5000/api/files",
+    fetcher,
+    { refreshInterval: 2000 }
+  )
   const [selectedFile, setSelectedFile] = useState<WorkflowFile | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [systemStats, setSystemStats] = useState({
@@ -38,86 +45,33 @@ export default function WorkflowDashboard() {
     avgProcessingTime: 0,
   })
 
-  // Simulate real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFiles((prev) =>
-        prev.map((file) => {
-          if (file.status === "processing") {
-            const newProgress = Math.min(file.progress + Math.random() * 10, 100)
-            return {
-              ...file,
-              progress: newProgress,
-              status: newProgress >= 100 ? "complete" : "processing",
-              lastUpdated: new Date().toISOString(),
-            }
-          }
-          return file
-        }),
-      )
-    }, 2000)
+  const handleFileUpload = async (
+    uploadedFiles: File[],
+    initialRole: string,
+    priority: string,
+  ) => {
+    const formData = new FormData()
+    uploadedFiles.forEach((file) => formData.append("files", file))
+    formData.append("initialRole", initialRole)
+    formData.append("priority", priority)
 
-    return () => clearInterval(interval)
-  }, [])
-
-  const handleFileUpload = (uploadedFiles: File[]) => {
-    const newFiles: WorkflowFile[] = uploadedFiles.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      currentRole: "captioner",
-      status: "pending",
-      progress: 0,
-      lastUpdated: new Date().toISOString(),
-      historyCount: 0,
-    }))
-
-    setFiles((prev) => [...prev, ...newFiles])
+    const res = await fetch("http://localhost:5000/api/upload", {
+      method: "POST",
+      body: formData,
+    })
+    const data = await res.json()
+    if (data.files) {
+      mutate()
+    }
   }
 
   const startWorkflow = async (fileId: string) => {
     setIsProcessing(true)
-
-    setFiles((prev) => prev.map((file) => (file.id === fileId ? { ...file, status: "processing", progress: 5 } : file)))
-
-    // Simulate workflow execution
-    setTimeout(() => {
-      setFiles((prev) =>
-        prev.map((file) =>
-          file.id === fileId
-            ? {
-                ...file,
-                currentRole: "translator",
-                progress: 50,
-                historyCount: 1,
-                outputs: { caption: "A beautiful image with vibrant colors" },
-              }
-            : file,
-        ),
-      )
-    }, 3000)
-
-    setTimeout(() => {
-      setFiles((prev) =>
-        prev.map((file) =>
-          file.id === fileId
-            ? {
-                ...file,
-                currentRole: "done",
-                status: "complete",
-                progress: 100,
-                historyCount: 2,
-                outputs: {
-                  caption: "A beautiful image with vibrant colors",
-                  translation: "Una hermosa imagen con colores vibrantes",
-                },
-              }
-            : file,
-        ),
-      )
-      setIsProcessing(false)
-    }, 6000)
+    await fetch(`http://localhost:5000/api/files/${fileId}/start`, {
+      method: "POST",
+    })
+    setIsProcessing(false)
+    mutate()
   }
 
   const getStatusColor = (status: string) => {

@@ -13,7 +13,7 @@ interface WorkflowFile {
   currentRole: string
   status: "pending" | "processing" | "complete" | "error"
   progress: number
-  lastUpdated: string
+  lastUpdated: number
   historyCount: number
 }
 

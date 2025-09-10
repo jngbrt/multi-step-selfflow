@@ -284,10 +284,12 @@ def get_worker_script(role):
         'optimizer': 'generic_worker.py',
         'analyzer': 'generic_worker.py'
     }
-    
+
     script_name = worker_scripts.get(role)
-    if script_name and os.path.exists(script_name):
-        return script_name
+    if script_name:
+        script_path = os.path.join(os.path.dirname(__file__), script_name)
+        if os.path.exists(script_path):
+            return script_path
     return None
 
 if __name__ == '__main__':

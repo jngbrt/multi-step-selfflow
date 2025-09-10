@@ -1,5 +1,6 @@
 "use client"
 
+import useSWR from "swr"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,7 +13,7 @@ interface WorkflowFile {
   currentRole: string
   status: string
   progress: number
-  lastUpdated: string
+  lastUpdated: number
   historyCount: number
   outputs?: Record<string, any>
 }
@@ -22,36 +23,25 @@ interface MetadataViewerProps {
 }
 
 export function MetadataViewer({ file }: MetadataViewerProps) {
-  const mockMetadata = {
-    version: 1.0,
-    current: {
-      role: file.currentRole,
-      status: file.status,
-      priority: 5,
-      created_at: "2025-01-11T19:22:17Z",
-      updated_at: file.lastUpdated,
-      instruction:
-        file.currentRole === "captioner"
-          ? "Generate a descriptive caption for this image"
-          : file.currentRole === "translator"
-            ? "Translate the caption to Spanish"
-            : "Process the file",
-    },
-    config: {
-      timeout_seconds: 300,
-      max_retries: 3,
-      allowed_roles: ["captioner", "translator", "resizer", "optimizer", "publisher", "done"],
-    },
-    history: Array.from({ length: file.historyCount }, (_, i) => ({
-      timestamp: new Date(Date.now() - (file.historyCount - i) * 60000).toISOString(),
-      role: i === 0 ? "captioner" : "translator",
-      action: "execute",
-      status: "success",
-      message: i === 0 ? "Generated caption successfully" : "Translated caption to Spanish",
-      duration_ms: 2000 + Math.random() * 1000,
-      worker_pid: 12345 + i,
-    })),
-    outputs: file.outputs || {},
+  const fetcher = (url: string) => fetch(url).then((res) => res.json())
+  const { data: metadata } = useSWR(
+    file ? `http://localhost:5000/api/files/${file.id}/metadata` : null,
+    fetcher,
+    { refreshInterval: 5000 }
+  )
+
+  if (!metadata) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            {file.name}
+          </CardTitle>
+          <CardDescription>Loading metadata...</CardDescription>
+        </CardHeader>
+      </Card>
+    )
   }
 
   return (
@@ -87,7 +77,7 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
                   <label className="text-sm font-medium text-gray-600">Current Role</label>
                   <div className="mt-1">
                     <Badge variant="outline" className="text-lg px-3 py-1">
-                      {mockMetadata.current.role}
+                      {metadata.current?.role}
                     </Badge>
                   </div>
                 </div>
@@ -97,40 +87,40 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
                   <div className="mt-1">
                     <Badge
                       className={
-                        mockMetadata.current.status === "complete"
+                        metadata.current?.status === "complete"
                           ? "bg-green-500"
-                          : mockMetadata.current.status === "processing"
+                          : metadata.current?.status === "processing"
                             ? "bg-blue-500"
-                            : mockMetadata.current.status === "error"
+                            : metadata.current?.status === "error"
                               ? "bg-red-500"
                               : "bg-gray-500"
                       }
                     >
-                      {mockMetadata.current.status}
+                      {metadata.current?.status}
                     </Badge>
                   </div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Priority</label>
-                  <div className="mt-1 text-lg font-medium">{mockMetadata.current.priority}/10</div>
+                  <div className="mt-1 text-lg font-medium">{metadata.current?.priority ?? 0}/10</div>
                 </div>
               </div>
 
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-600">Created</label>
-                  <div className="mt-1 text-sm">{new Date(mockMetadata.current.created_at).toLocaleString()}</div>
+                  <div className="mt-1 text-sm">{new Date(metadata.current?.created_at || 0).toLocaleString()}</div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Last Updated</label>
-                  <div className="mt-1 text-sm">{new Date(mockMetadata.current.updated_at).toLocaleString()}</div>
+                  <div className="mt-1 text-sm">{new Date(metadata.current?.updated_at || 0).toLocaleString()}</div>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-gray-600">Processing Steps</label>
-                  <div className="mt-1 text-lg font-medium">{mockMetadata.history.length}</div>
+                  <div className="mt-1 text-lg font-medium">{metadata.history?.length || 0}</div>
                 </div>
               </div>
             </div>
@@ -138,22 +128,22 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
             <div>
               <label className="text-sm font-medium text-gray-600">Current Instruction</label>
               <div className="mt-1 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm">{mockMetadata.current.instruction}</p>
+                <p className="text-sm">{metadata.current?.instruction}</p>
               </div>
             </div>
 
             <div>
               <label className="text-sm font-medium text-gray-600">Workflow Sequence</label>
               <div className="mt-1 flex flex-wrap gap-2">
-                {mockMetadata.config.allowed_roles.map((role, index) => (
+                {metadata.config?.allowed_roles?.map((role: string, index: number) => (
                   <div key={role} className="flex items-center">
                     <Badge
-                      variant={role === mockMetadata.current.role ? "default" : "outline"}
-                      className={role === mockMetadata.current.role ? "bg-blue-600" : ""}
+                      variant={role === metadata.current?.role ? "default" : "outline"}
+                      className={role === metadata.current?.role ? "bg-blue-600" : ""}
                     >
                       {role}
                     </Badge>
-                    {index < mockMetadata.config.allowed_roles.length - 1 && (
+                    {index < metadata.config.allowed_roles.length - 1 && (
                       <span className="mx-2 text-gray-400">→</span>
                     )}
                   </div>
@@ -164,29 +154,24 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
 
           <TabsContent value="history" className="space-y-4">
             <div className="space-y-3">
-              {mockMetadata.history.length === 0 ? (
+              {(!metadata.history || metadata.history.length === 0) ? (
                 <div className="text-center py-8 text-gray-500">
                   <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No processing history yet</p>
                 </div>
               ) : (
-                mockMetadata.history.map((entry, index) => (
+                metadata.history.map((entry: any, index: number) => (
                   <div key={index} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
                         <Badge variant="outline">{entry.role}</Badge>
-                        <span className="text-sm text-gray-600">{entry.action}</span>
+                        <span className="text-sm text-gray-600">{entry.status}</span>
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <span>{entry.duration_ms}ms</span>
-                        <span>•</span>
-                        <span>{new Date(entry.timestamp).toLocaleTimeString()}</span>
+                        <span>{new Date(entry.updated_at || 0).toLocaleTimeString()}</span>
                       </div>
                     </div>
-                    <p className="text-sm">{entry.message}</p>
-                    <div className="mt-2 text-xs text-gray-500">
-                      Status: {entry.status} • Worker PID: {entry.worker_pid}
-                    </div>
+                    {entry.message && <p className="text-sm">{entry.message}</p>}
                   </div>
                 ))
               )}
@@ -195,13 +180,13 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
 
           <TabsContent value="outputs" className="space-y-4">
             <div className="space-y-4">
-              {Object.keys(mockMetadata.outputs).length === 0 ? (
+              {(!metadata.outputs || Object.keys(metadata.outputs).length === 0) ? (
                 <div className="text-center py-8 text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                   <p>No outputs generated yet</p>
                 </div>
               ) : (
-                Object.entries(mockMetadata.outputs).map(([role, output]) => (
+                Object.entries(metadata.outputs).map(([role, output]) => (
                   <div key={role} className="border rounded-lg p-4">
                     <h3 className="font-medium mb-3 flex items-center gap-2">
                       <Badge variant="outline">{role}</Badge>
@@ -231,7 +216,7 @@ export function MetadataViewer({ file }: MetadataViewerProps) {
             <div>
               <label className="text-sm font-medium text-gray-600 mb-2 block">Raw Metadata (JSON)</label>
               <pre className="bg-gray-50 p-4 rounded-lg text-xs overflow-x-auto border">
-                {JSON.stringify(mockMetadata, null, 2)}
+                {JSON.stringify(metadata, null, 2)}
               </pre>
             </div>
           </TabsContent>
