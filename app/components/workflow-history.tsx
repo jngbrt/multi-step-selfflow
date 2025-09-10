@@ -12,7 +12,7 @@ interface WorkflowFile {
   name: string
   currentRole: string
   status: string
-  lastUpdated: string
+  lastUpdated: number
   historyCount: number
 }
 

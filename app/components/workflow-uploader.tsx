@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, FileImage, FileText, Archive, X } from "lucide-react"
 
 interface WorkflowUploaderProps {
-  onFilesUploaded: (files: File[]) => void
+  onFilesUploaded: (files: File[], initialRole: string, priority: string) => void
 }
 
 export function WorkflowUploader({ onFilesUploaded }: WorkflowUploaderProps) {
@@ -67,9 +67,8 @@ export function WorkflowUploader({ onFilesUploaded }: WorkflowUploaderProps) {
 
   const uploadFiles = () => {
     if (selectedFiles.length > 0) {
-      onFilesUploaded(selectedFiles)
+      onFilesUploaded(selectedFiles, initialRole, priority)
       setSelectedFiles([])
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
